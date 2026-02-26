@@ -8,12 +8,12 @@ export function Footer() {
                     <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
                         Built by{" "}
                         <a
-                            href="https://shaizamalikai.vercel.app"
+                            href="https://harshmriduhash.vercel.app"
                             target="_blank"
                             rel="noreferrer"
                             className="font-medium underline underline-offset-4"
                         >
-                            Shaiza Malik
+                            Harsh Mriduhash
                         </a>
                     </p>
                 </div>
