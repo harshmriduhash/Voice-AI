@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+model User {
+  id                  String   @id @map("_id") @db.String // Clerk User ID
+  email               String?
+  subscriptionStatus  String   @default("free")
+  creditsRemaining    Int      @default(300)
+  createdAt           DateTime @default(now())
+  conversations       Conversation[]
+  userCoupons         UserCoupon[]
+
+  @@map("profiles")
+}
+
+model Conversation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  messages  Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String   @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String   // 'user' or 'assistant'
+  text           String?
+  durationSec    Int?     @map("audio_duration_sec")
+  createdAt      DateTime @default(now())
+
+  @@map("messages")
+}
+
+model Coupon {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  code            String   @unique
+  description     String?
+  bonusCredits    Int
+  maxRedemptions  Int
+  redemptionsCount Int     @default(0)
+  expiresAt       DateTime?
+  userCoupons     UserCoupon[]
+
+  @@map("coupons")
+}
+
+model UserCoupon {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  couponId  String   @db.ObjectId
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  redeemedAt DateTime @default(now())
+
+  @@unique([userId, couponId])
+  @@map("user_coupons")
+}

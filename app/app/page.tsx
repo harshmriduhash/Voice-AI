@@ -1,43 +1,46 @@
 import { Orb } from "@/components/orb"
-import { Button } from "@/components/ui/button"
-import { Mic, MessageSquare, Clock } from "lucide-react"
-import { createClient } from "@/lib/supabase/server"
+import { Clock } from "lucide-react"
+import { currentUser } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import { ConversationDate } from "@/components/conversation-date"
+import db from "@/lib/db"
 
 export const dynamic = 'force-dynamic'
 
 export default async function AppDashboard() {
-    const supabase = await createClient()
-
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const user = await currentUser()
 
     if (!user) {
-        return redirect("/auth/login")
+        return redirect("/")
     }
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single()
+    // Ensure user profile exists in MongoDB
+    let profile = await db.user.findUnique({
+        where: { id: user.id }
+    })
+
+    if (!profile) {
+        profile = await db.user.create({
+            data: {
+                id: user.id,
+                email: user.emailAddresses[0]?.emailAddress,
+                subscriptionStatus: "free",
+                creditsRemaining: 300,
+            }
+        })
+    }
 
     // Fetch recent conversations with their latest messages
-    const { data: conversations } = await supabase
-        .from("conversations")
-        .select(`
-            *,
-            messages (
-                text,
-                role,
-                created_at
-            )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(20) // Increased limit to show more history
+    const conversations = await db.conversation.findMany({
+        where: { userId: user.id },
+        include: {
+            messages: {
+                orderBy: { createdAt: 'asc' }
+            }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20
+    })
 
     return (
         <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
@@ -50,22 +53,19 @@ export default async function AppDashboard() {
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {conversations?.map((conv, index) => {
-                        // Sort messages by time (oldest first for reading flow)
-                        const sortedMessages = conv.messages?.sort((a: any, b: any) =>
-                            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                        ) || []
+                        // Prisma include: sortedMessages is already an array
+                        const sortedMessages = conv.messages || []
 
                         // Check if we should show the date header
-                        // Show if it's the first item OR if the date is different from the previous item
-                        const currentDate = new Date(conv.created_at).toLocaleDateString();
-                        const prevDate = index > 0 ? new Date(conversations[index - 1].created_at).toLocaleDateString() : null;
+                        const currentDate = new Date(conv.createdAt).toLocaleDateString();
+                        const prevDate = index > 0 ? new Date(conversations[index - 1].createdAt).toLocaleDateString() : null;
                         const showDateHeader = index === 0 || currentDate !== prevDate;
 
                         return (
                             <div key={conv.id} className="space-y-2">
                                 {showDateHeader && (
                                     <div className="sticky top-0 bg-card/95 backdrop-blur z-10 py-2 border-b border-border/50">
-                                        <ConversationDate date={conv.created_at} />
+                                        <ConversationDate date={conv.createdAt.toISOString()} />
                                     </div>
                                 )}
 
@@ -115,10 +115,10 @@ export default async function AppDashboard() {
 
                     <div className="flex items-center space-x-4">
                         <div className="px-4 py-2 rounded-full bg-muted/50 border border-border text-sm text-muted-foreground">
-                            Status: <span className="text-green-400 font-medium capitalize">{profile?.subscription_status || 'Free'}</span>
+                            Status: <span className="text-green-400 font-medium capitalize">{profile?.subscriptionStatus || 'Free'}</span>
                         </div>
                         <div className="px-4 py-2 rounded-full bg-muted/50 border border-border text-sm text-muted-foreground">
-                            Credits: <span className="text-gradient-premium font-medium">{profile?.credits_remaining || 0}</span>
+                            Credits: <span className="text-gradient-premium font-medium">{profile?.creditsRemaining || 0}</span>
                         </div>
                     </div>
                 </div>
