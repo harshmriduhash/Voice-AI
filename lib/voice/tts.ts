@@ -1,8 +1,16 @@
 import { createClient } from "@deepgram/sdk";
 
-const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+
+function getDeepgramClient() {
+    const apiKey = process.env.DEEPGRAM_API_KEY;
+    if (!apiKey) {
+        console.warn("⚠️ DEEPGRAM_API_KEY is missing. Deepgram client will not be initialized.");
+    }
+    return createClient(apiKey || "missing_key");
+}
 
 export async function synthesizeSpeech(text: string): Promise<Buffer> {
+    const deepgram = getDeepgramClient();
     try {
         const response = await deepgram.speak.request(
             { text },
