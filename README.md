@@ -11,10 +11,10 @@ A real-time voice AI agent SaaS application built with Next.js 14+, featuring Cl
 - **Core Pages**: Landing, Pricing, Dashboard, Auth
 
 ### Phase 2 - Authentication ✅
-- **Supabase Auth**: Email/password authentication with email verification
+- **Clerk Auth**: Modern, secure authentication with social login support
 - **Protected Routes**: Middleware-based route protection
-- **User Profiles**: Automatic profile creation with credits tracking
-- **Session Management**: Secure server-side session handling
+- **User Profiles**: Automatic MongoDB profile creation on first login
+- **Session Management**: Secure server-side session handling via Clerk
 
 ### Phase 3 - Voice Agent ✅
 - **Real-time STT**: Deepgram Nova-2 for speech-to-text
@@ -91,61 +91,55 @@ cd voice-ai-saas
 npm install
 ```
 
-### 2. Supabase Setup
+### 2. Clerk Setup
+1. Create a new Clerk application.
+2. Get your `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
 
-1. Create a new Supabase project at [database.new](https://database.new)
-2. Run the SQL schema files in your Supabase SQL Editor:
-   - First: `supabase_schema.sql` (profiles table)
-   - Then: `supabase_schema_phase4.sql` (conversations, messages, coupons)
-
-### 3. Deepgram Setup
-
-1. Sign up at [console.deepgram.com](https://console.deepgram.com)
-2. Create a new API Key
+### 3. MongoDB & Prisma Setup
+1. Create a [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) account and cluster.
+2. Get your `DATABASE_URL`.
+3. Sync your schema:
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
 
 ### 4. Environment Variables
-
-Create a `.env.local` file in the root directory:
-
+Create a `.env.local` file:
 ```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 
-# Deepgram
-DEEPGRAM_API_KEY=your-deepgram-api-key
+# Database
+DATABASE_URL="mongodb+srv://..."
+
+# Voice & AI
+DEEPGRAM_API_KEY=your-deepgram-key
+GEMINI_API_KEY=your-gemini-key
 ```
 
 ### 5. Run Development Server
-
 ```bash
 npm run dev
 ```
 
-Open https://voice-aisaas.vercel.app/ in your browser.
+---
 
 ## 📁 Project Structure
-
 ```
 voice-ai-saas/
 ├── app/
-│   ├── api/
-│   │   ├── voice/conversation/    # Voice processing endpoint
-│   │   ├── coupons/redeem/        # Coupon redemption
-│   │   └── payment/mock/          # Mock payment processing
-│   ├── auth/                      # Authentication pages
-│   ├── app/                       # Main dashboard
-│   ├── pricing/                   # Pricing page with coupons
-│   └── page.tsx                   # Landing page
-├── components/
-│   ├── ui/                        # Base UI components
-│   ├── navbar.tsx                 # Navigation with auth state
-│   └── orb.tsx                    # Voice visualizer
+│   ├── api/                       # API Routes (Voice, Payments, Coupons)
+│   ├── app/                       # Main Dashboard
+│   ├── pricing/                   # Pricing & Redemptions
+│   └── page.tsx                   # Landing Page
+├── prisma/
+│   └── schema.prisma              # Database Schema
 ├── lib/
-│   ├── supabase/                  # Supabase client utilities
-│   ├── voice/                     # STT/TTS implementations
-│   └── ai/                        # AI agent logic
-└── supabase_schema*.sql           # Database schemas
+│   ├── db.ts                      # Prisma Client
+│   ├── voice/                     # Voice Processing
+│   └── ai/                        # AI Logic
 ```
 
 ## 💳 Credits & Pricing
@@ -160,11 +154,11 @@ Try the code `CAPSTONE_KING` for 1,000 bonus credits!
 
 ## 🔐 Authentication Flow
 
-1. User signs up with email/password
-2. Email verification sent
-3. User verifies email and logs in
-4. Profile automatically created with 300 free credits
-5. Protected routes redirect to login if unauthenticated
+1. User clicks "Get Started" or "Login"
+2. Clerk handles auth via highly secure modals/pages
+3. Secure JWT session managed by Clerk
+4. Protected routes (like `/app`) redirect to home if unauthenticated
+5. User profile automatically created in MongoDB on first dashboard access
 
 ## 🎙️ Voice Agent Flow
 

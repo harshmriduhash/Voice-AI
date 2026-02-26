@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Users, MessageSquare, Database, Ticket } from "lucide-react"
 import { getAdminStats, createCoupon, deleteUser } from "./actions"
-import { createClient } from "@/lib/supabase/client"
+import { useUser } from "@clerk/nextjs"
 import { ADMIN_CONFIG } from "./config"
 
 export default function AdminDashboard() {
@@ -21,16 +21,18 @@ export default function AdminDashboard() {
     const [isCreating, setIsCreating] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
+    const { user, isLoaded } = useUser()
+
     useEffect(() => {
-        const checkAccess = async () => {
-            const supabase = createClient()
-            const { data: { user } } = await supabase.auth.getUser()
+        if (!isLoaded) return
 
-            if (!user || !user.email || !ADMIN_CONFIG.allowedEmails.includes(user.email)) {
-                router.push("/app") // Redirect unauthorized users
-                return
-            }
+        const email = user?.emailAddresses[0]?.emailAddress
+        if (!user || !email || !ADMIN_CONFIG.allowedEmails.includes(email)) {
+            router.push("/app")
+            return
+        }
 
+        const fetchStats = async () => {
             try {
                 const data = await getAdminStats()
                 setStats(data)
@@ -41,8 +43,8 @@ export default function AdminDashboard() {
             }
         }
 
-        checkAccess()
-    }, [router])
+        fetchStats()
+    }, [user, isLoaded, router])
 
     const handleCreateCoupon = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -175,19 +177,19 @@ export default function AdminDashboard() {
                                     <div>
                                         <p className="font-medium text-sm">{user.email}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {new Date(user.created_at).toLocaleDateString()}
+                                            {new Date(user.createdAt).toLocaleDateString()}
                                         </p>
                                     </div>
                                     <div className="text-right flex items-center gap-4">
                                         <div>
-                                            <span className={`text-xs px-2 py-1 rounded-full ${user.subscription_status === 'pro'
+                                            <span className={`text-xs px-2 py-1 rounded-full ${user.subscriptionStatus === 'pro'
                                                 ? 'bg-primary/20 text-primary'
                                                 : 'bg-muted text-muted-foreground'
                                                 }`}>
-                                                {user.subscription_status || 'free'}
+                                                {user.subscriptionStatus || 'free'}
                                             </span>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                {user.credits_remaining} credits
+                                                {user.creditsRemaining} credits
                                             </p>
                                         </div>
                                         <Button

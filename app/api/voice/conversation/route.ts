@@ -1,9 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { transcribeAudio } from "@/lib/voice/stt";
-import { synthesizeSpeech } from "@/lib/voice/tts";
-import { generateAIResponse } from "@/lib/ai/agent";
-import { getAuth } from "@clerk/nextjs/server";
 import db from "@/lib/db";
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     try {
