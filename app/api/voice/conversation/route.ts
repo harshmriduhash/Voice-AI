@@ -2,28 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { transcribeAudio } from "@/lib/voice/stt";
 import { synthesizeSpeech } from "@/lib/voice/tts";
 import { generateAIResponse } from "@/lib/ai/agent";
-import { createClient } from "@/lib/supabase/server";
+import { getAuth } from "@clerk/nextjs/server";
+import db from "@/lib/db";
 
 export async function POST(req: NextRequest) {
     try {
         // 1. Check Auth
-        const supabase = await createClient();
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
+        const { userId } = getAuth(req);
 
-        if (!user) {
+        if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // 2. Check Credits
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("credits_remaining")
-            .eq("id", user.id)
-            .single();
+        const profile = await db.user.findUnique({
+            where: { id: userId },
+            select: { creditsRemaining: true }
+        });
 
-        if (!profile || profile.credits_remaining <= 0) {
+        if (!profile || profile.creditsRemaining <= 0) {
             return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
         }
 
@@ -55,7 +52,6 @@ export async function POST(req: NextRequest) {
         const audioResponse = await synthesizeSpeech(aiResponseText);
 
         // 7. DB Operations (History & Credits)
-        // Determine Conversation ID (Group by Day)
         let activeConversationId = conversationId;
 
         if (!activeConversationId) {
@@ -63,50 +59,62 @@ export async function POST(req: NextRequest) {
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            const { data: existingDailyConv } = await supabase
-                .from("conversations")
-                .select("id")
-                .eq("user_id", user.id)
-                .gte("created_at", todayStart.toISOString())
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .single();
+            const existingDailyConv = await db.conversation.findFirst({
+                where: {
+                    userId: userId,
+                    createdAt: { gte: todayStart }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
 
             if (existingDailyConv) {
                 activeConversationId = existingDailyConv.id;
             } else {
                 // Create new conversation for today
-                const { data: newConv } = await supabase
-                    .from("conversations")
-                    .insert({ user_id: user.id })
-                    .select()
-                    .single();
-                if (newConv) activeConversationId = newConv.id;
+                const newConv = await db.conversation.create({
+                    data: { userId: userId }
+                });
+                activeConversationId = newConv.id;
             }
         }
 
         if (activeConversationId) {
-            // Save User Message
-            await supabase.from("messages").insert({
-                conversation_id: activeConversationId,
-                role: "user",
-                text: transcript,
-            });
-
-            // Save AI Message
-            await supabase.from("messages").insert({
-                conversation_id: activeConversationId,
-                role: "assistant",
-                text: aiResponseText,
+            // Save Messages in a transaction or sequential (Prisma batching)
+            await db.message.createMany({
+                data: [
+                    {
+                        conversationId: activeConversationId,
+                        role: "user",
+                        text: transcript,
+                    },
+                    {
+                        conversationId: activeConversationId,
+                        role: "assistant",
+                        text: aiResponseText,
+                    }
+                ]
             });
         }
 
         // Deduct Credits (Simple cost model: 10 credits per turn)
         const COST_PER_TURN = 10;
-        await supabase
-            .from("profiles")
-            .update({ credits_remaining: Math.max(0, profile.credits_remaining - COST_PER_TURN) })
-            .eq("id", user.id);
+        const updatedProfile = await db.user.update({
+            where: { id: userId },
+            data: {
+                creditsRemaining: {
+                    decrement: COST_PER_TURN
+                }
+            }
+        });
+
+        // Ensure credits don't go below 0 (Prisma decrement doesn't guard this automatically in all DBs, but 402 check handled it)
+        const resultingCredits = Math.max(0, updatedProfile.creditsRemaining);
+        if (updatedProfile.creditsRemaining < 0) {
+            await db.user.update({
+                where: { id: userId },
+                data: { creditsRemaining: 0 }
+            });
+        }
 
 
         // 8. Return Audio
@@ -116,7 +124,7 @@ export async function POST(req: NextRequest) {
                 "X-Transcript": encodeURIComponent(transcript),
                 "X-AI-Response": encodeURIComponent(aiResponseText),
                 "X-Conversation-Id": activeConversationId || "",
-                "X-Credits-Remaining": (profile.credits_remaining - COST_PER_TURN).toString(),
+                "X-Credits-Remaining": resultingCredits.toString(),
             },
         });
 

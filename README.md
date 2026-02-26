@@ -1,6 +1,6 @@
 # VoiceAI SaaS
 
-A real-time voice AI agent SaaS application built with Next.js 14, featuring Supabase authentication, Deepgram voice processing, and a complete credits-based payment system.
+A real-time voice AI agent SaaS application built with Next.js 14+, featuring Clerk authentication, Deepgram voice processing, MongoDB database (via Prisma), and a complete credits-based payment system.
 
 ## ✨ Features
 
@@ -23,20 +23,61 @@ A real-time voice AI agent SaaS application built with Next.js 14, featuring Sup
 - **Interactive Orb**: Visual feedback with 4 states (idle, listening, thinking, speaking)
 
 ### Phase 4 - SaaS Features ✅
+- **Clerk Authentication**: Modern, secure login/signup with social options
+- **MongoDB + Prisma**: Scalable, type-safe database for user data and history
 - **Credits System**: Usage-based billing (10 credits per interaction)
 - **Coupon Redemption**: Apply promo codes for bonus credits
 - **Mock Payments**: Simulated Pro upgrade flow
 - **Conversation History**: Track and display past conversations
-- **Out of Credits Modal**: Graceful handling when credits run out
+
+---
+
+## 💼 SaaS Analysis: Is this a viable product?
+
+### 1. What problem does it solve?
+Developing real-time voice-to-voice AI is a complex engineering challenge involving:
+- Lowering latency (STT -> LLM -> TTS)
+- Managing websocket connections
+- Handling audio buffering and playback
+- Building a scalable usage-based billing logic
+
+**VoiceAI** solves this by providing a "Voice Infra in a Box," allowing businesses or developers to deploy a high-performance voice assistant in minutes.
+
+### 2. How does this product solve the problem?
+It integrates best-in-class providers (**Deepgram** for ultra-low latency audio and **Gemini 2.0 Flash** for fast reasoning) into a unified, premium UI. It provides all the "boring" but critical parts of a SaaS: auth, database, and credit management.
+
+### 3. Does it save time?
+**Absolutely.** Building this from scratch would take weeks of specialized engineering time. With VoiceAI, the foundation is ready in minutes.
+
+### 4. Does it save money?
+Yes. By using a serverless/usage-based model, there are zero upfront costs for infrastructure. Costs only scale as your user base grows.
+
+---
+
+## 🏗️ Software Architecture & System Design
+
+### High-Level Architecture
+```mermaid
+graph TD
+    Client[Next.js Frontend] -->|Auth| Clerk[Clerk Auth]
+    Client -->|API Requests| Vercel[Vercel Serverless]
+    Vercel -->|Query/Update| MongoDB[MongoDB Atlas]
+    Vercel -->|STT/TTS| Deepgram[Deepgram API]
+    Vercel -->|Reasoning| Gemini[Gemini AI]
+    Vercel -->|ORM| Prisma[Prisma]
+```
+
+---
 
 ## 🛠 Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 14/15/16 (App Router)
 - **Styling**: Tailwind CSS v4
 - **Animations**: Framer Motion
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Auth
+- **Database**: MongoDB Atlas (via Prisma)
+- **Auth**: Clerk
 - **Voice**: Deepgram (STT + TTS)
+- **AI**: Google Gemini 2.0 Flash
 - **Icons**: Lucide React
 - **Language**: TypeScript
 

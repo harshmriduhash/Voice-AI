@@ -1,42 +1,27 @@
-
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAuth } from "@clerk/nextjs/server";
+import db from "@/lib/db";
 
 export async function POST(req: NextRequest) {
     try {
-        const supabase = await createClient();
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
+        const { userId } = getAuth(req);
 
-        if (!user) {
+        if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // Simulate payment processing delay
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // Get current credits first
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("credits_remaining")
-            .eq("id", user.id)
-            .single();
-
-        const currentCredits = profile?.credits_remaining || 0;
-
-        // Update Profile (Add Credits ONLY, do NOT grant Pro status)
-        const { error } = await supabase
-            .from("profiles")
-            .update({
-                // subscription_status: "pro", // REMOVED: Only coupons grant Pro now
-                credits_remaining: currentCredits + 5000, // Add 5000 credits
-            })
-            .eq("id", user.id);
-
-        if (error) {
-            throw error;
-        }
+        // Update User Profile with credits
+        await db.user.update({
+            where: { id: userId },
+            data: {
+                creditsRemaining: {
+                    increment: 5000
+                }
+            }
+        });
 
         return NextResponse.json({ success: true });
 
